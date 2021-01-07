@@ -1,0 +1,156 @@
+---
+title: "Exercise_sheet_4_Dingyi_Lai"
+author: "Dingyi Lai"
+date: "12/9/2020"
+output: html_document
+---
+
+#   Exercise 1
+
+```{r}
+mySimulation1 <- function(n,nboot,nsim,Dist){
+  tauhat2 = c()
+  #Generate n*nsim random samples from different distributions
+  if(Dist == "Normal") x <- matrix(rnorm(n*nsim, mean = 0, sd = 1),ncol = nsim)
+  if(Dist == "LogNormal") x <- matrix((exp(rnorm(n = n*nsim, mean = 0, sd = 1)) - exp(1/2)) / sqrt(exp(1)*(exp(1)-1)),
+                                      ncol = nsim)
+  if(Dist == "Exponential") x <- matrix((rexp(n = n*nsim, rate = 1) - 1) / sqrt(1), ncol = nsim)
+  if(Dist == "Chisq10") x <- matrix((rchisq(n = n*nsim, df = 10) - 10) / sqrt(20), ncol = nsim)
+  if(Dist == "Uniform") x <- matrix((runif(n = n*nsim, min = 0, max = 1) - 1/2) / sqrt(1/12), ncol = nsim)
+  
+
+  #Compute the estimator upon the sample and save the value
+  B <- apply(matrix(1:n,ncol=nboot,nrow = n), 2, sample, replace=TRUE)
+  for (i in 1:nsim) {
+    xstar <-  matrix(x[,i][B], ncol = nboot,nrow = n)
+    mxstar <-  colMeans(xstar)
+    tauhat2[i] <-  var(mxstar)
+  }
+  
+  mx <- colMeans(x)
+  tauemphat2 <- (colSums(x^2)-n*mx^2)/(n-1)/n
+  
+  #Assess the bias and MSE
+  bias_tauhat2 <- round(sum(tauhat2-(1^2)/n)/nsim,4)
+  bias_tauemphat2 <- round(sum(tauemphat2-(1^2)/n)/nsim,4)
+  
+  MSE_tauhat2 <- round(sum((tauhat2-(1^2)/n)^2)/nsim,4)
+  MSE_tauemphat2 <- round(sum((tauemphat2-(1^2)/n)^2)/nsim,4)
+  
+  result = data.frame(n=n,nsim=nsim,nboot=nboot,Dist=Dist, bias_tauhat2=bias_tauhat2, bias_tauemphat2 = bias_tauemphat2, MSE_tauhat2 = MSE_tauhat2, MSE_tauemphat2 = MSE_tauemphat2)
+  write.table(result, row.names = FALSE, col.names = FALSE, quote = FALSE, append = TRUE)
+  return(result)
+}
+
+
+nboot <- 10000
+nsim <- 10000
+n <- c(5,10,20,50)
+Dist <- c("Normal", "LogNormal", "Exponential", "Chisq10", "Uniform")
+for(h in 1:length(n)){
+  for(i in 1:length(Dist)){
+      mySimulation1(n[h],nboot,nsim,Dist[i])
+  }
+}
+```
+-   The Bootstrap estimate has always a smaller MSE than the empirical estimate. Both are getting closer to zero, if the sample size increases. The bias of the empirical estimator is very close to zero, even for very small sample sizes
+
+#   Exercise 2
+
+Estimate the variance of correlation coefficients using resampling strategies. How can you get an idea about the true variance? Is bootstrapping a good way?
+
+The variance of sample correlation is $Var(r) = \frac{(1-r^2)^2}{n-2}$
+Because I set a function in the simulation, so the true variance of correlation coefficients should be 0
+
+
+```{r}
+mySimulation2 <- function(mu,sd,n,nboot,nsim,beta){
+  var_rou = var_rouboot = corxy = corxyboot = c()
+  e <- matrix(rnorm(n = n*nsim, mean = 0, sd = 1), ncol = nsim)
+  x <- matrix(rnorm(n = n*nsim, mean = mu, sd = sd), ncol = nsim)
+  y=3+beta*x+e
+  sd_y <- sqrt((beta*sd)^2+1)
+  corryx_true <- beta*sd/sd_y
+
+
+  #Compute the estimator upon the sample and save the value
+  B <- apply(matrix(1:n,ncol=nboot,nrow = n), 2, sample, replace=TRUE)
+  for (i in 1:nsim) {
+    corxy[i] <- cor(x[,i],y[,i])
+    corxyboot[i] <- cor(x[,i][B],y[,i][B])
+    var_rou[i] <- (1-corxy[i]^2)^2/(n-2)
+    var_rouboot[i] <- (1-corxyboot[i]^2)^2/(n-2)
+  }
+  
+  #sapply(1:nsim,function(arg){cor(x[,arg],y[,arg])})
+  
+  #Assess the bias and MSE
+  bias <- sum(var_rou)/nsim
+  bias_boot <- sum(var_rouboot)/nsim
+  
+  MSE <- sum((var_rou)^2)/nsim
+  MSE_boot <- sum((var_rouboot)^2)/nsim
+  
+  result = data.frame(n=n,nsim=nsim,nboot=nboot, bias=bias, bias_boot = bias_boot, MSE = MSE, MSE_boot = MSE_boot)
+  return(result)
+}
+
+mu <- 3
+sd <- 2
+n <- 10
+nboot <- 1000
+nsim <- 1000
+beta <- 4
+
+mySimulation2(mu,sd,n,nboot,nsim,beta)
+
+```
+
+Here shows that the two techniques(resampling and bootstrap is almost the same)
+
+```{r}
+# Exercise 2 - Variance of correlation coefficients
+library(mvtnorm, quietly = TRUE)
+
+
+Simu_corr <- function(n, mu, sigma, dist, nsim, nboot) {
+  vrho <- c()
+  B <- apply(matrix(1:n, ncol = nboot, nrow = n), 2, sample, replace = TRUE)
+  for (i in 1:nsim) {
+    #-----Generate paired data-----#
+    if (dist == "Normal") {
+      x <- rmvnorm(n = n, mean = mu, sigma = sigma)
+    }
+    if (dist == "LogNor") {
+      x <- exp(rmvnorm(n = n, mean = mu, sigma = sigma))
+    }
+    #-----Generate bootstrap samples-----#
+    xstar <- matrix(x[, 1][B], ncol = nboot, nrow = n)
+    ystar <- matrix(x[, 2][B], ncol = nboot, nrow = n)
+    xystar <- xstar * ystar
+    sx <- colSums(xstar)
+    sy <- colSums(ystar)
+    sxy <- colSums(xystar)
+    covxy <- (n * sxy) - (sx * sy)
+    vx <- (n * colSums(xstar ^ 2)) - (sx ^ 2)
+    vy <- (n * colSums(ystar ^ 2)) - (sy ^ 2)
+    rho <- covxy / sqrt(vx * vy)
+    #-----Calculate a point estimate of the variance of rho-----#
+    vrho[i] <- var(rho)
+  }
+  #-----Plot a histogram of the distribution of the point estimate-----#
+  hist(vrho)
+  #-----Compute 95% CI-----#
+  CI <- quantile(vrho, c(0.025, 0.975))
+  result <- data.frame(dist = dist, n = n, rho = mean(rho), varrho = mean(vrho), lowerCI = CI[1], upperCI = CI[2])
+  result
+}
+Simu_corr(n = 10, mu = c(0, 0), sigma = diag(2) + 0.5 * (1 - diag(2)),
+       dist = "Normal", nsim = 1000, nboot = 1000)
+Simu_corr(n = 100, mu = c(0, 0), sigma = diag(2) + 0.5 * (1 - diag(2)),
+          dist = "Normal", nsim = 1000, nboot = 1000)
+Simu_corr(n = 100, mu = c(0, 0), sigma = diag(2) + 0.5 * (1 - diag(2)),
+          dist = "LogNor", nsim = 1000, nboot = 1000)
+```
+
+We see that the distribution of V ar(ρ) is very skewed and it becomes smaller with larger n.
