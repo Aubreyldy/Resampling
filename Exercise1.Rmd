@@ -1,0 +1,265 @@
+---
+title: "Exercise_sheet_1_Dingyi_Lai"
+author: "Dingyi Lai"
+date: "11/17/2020"
+output:
+  html_document:
+    includes:
+    in_header: header.tex
+    latex_engine: xelatex
+    toc: true
+    depth: 3
+    number_sections: true
+    theme: united
+    highlight: tango
+    toc_float: true
+    fontsize: "12pt"
+    papersize: "a5"
+    geometry: "margin=1in"
+---
+# Exercise 1
+
+Show that the sample variance: $$ S^2 = \frac{1}{(n-1)}\sum_{i=1}^n{(X_i-\bar{X})^2} $$
+can be simplified to: $$ S^2 = \frac{1}{(n-1)}[\sum_{i=1}^n{X_i^2-n\bar{X}^2}] $$
+
+-   Solve it by hands
+
+# Exercise 2
+
+Consider a one sample $X_k \sim F,\ k = 1,...,n$, where F is a known distribution. We are interested in estimating the type-I error rate and the power of the one sample t-test and we would like to investigate how the error rate and power are affected by the sample size n. Write a simulation program following the steps below. Use matrix techniques for efficient implementation.
+
+##  question 1
+
+Generate random data $X_k$ from a normalized population $F$ , where $F$ is normal, exponential, log-normal, chi-squared and uniform distributions.
+
+- create a function "mysimulation1"
+
+```{r}
+# Efficient implementation 
+mysimulation <- function(Dist, n, nsim) {
+  
+  crit <- qt(0.975, n-1) # Critical value at 5% level
+  
+  if(Dist == "Normal") {
+    x <- matrix(rnorm(n = n*nsim, mean = 0, sd = 1), ncol = nsim)
+  }
+  if(Dist == "Exponential") {
+    x <- matrix(((rexp(n = n*nsim, rate = 1) - 1) / sqrt(1)), ncol = nsim)
+  }
+  #rate=1 is default
+  
+  if(Dist == "Lognormal") {
+    x <- matrix(((exp(rnorm(n = n*nsim, mean = 0, sd = 1)) - exp(1/2)) / sqrt(exp(1)*(exp(1)-1))), ncol = nsim)
+  }
+  # The mean is E(X) = exp(μ + 1/2 σ^2), the median is med(X) = exp(μ), and the variance Var(X) = exp(2*μ + σ^2)*(exp(σ^2) - 1)  
+  #x <- matrix(((rlnorm(n=n*nsim)-exp(.5))/sqrt(exp(1)*(exp(1)-1))),ncol=nsim)
+  
+  if(Dist == "Chisq10") {
+    x <- matrix(((rchisq(n = n*nsim, df = 10) - 10) / sqrt(20)), ncol = nsim)
+  }
+  #df could be set randomly
+  
+  if(Dist == "Uniform") {
+    x <- matrix(((runif(n = n*nsim, min = 0, max = 1) - 1/2) / sqrt(1/12)), ncol = nsim)
+  }
+  
+  mx <- colMeans(x)
+  vx <- (colSums(x^2) - n*mx^2) / (n-1)
+  tTest <- sqrt(n) * mx / sqrt(vx)
+  result <- data.frame(n = n, Dist = Dist, tTest = mean(abs(tTest) > crit))
+  write.table(result, sep = "\t",  eol = "\r\n", row.names = FALSE, col.names = FALSE, quote = FALSE, append = TRUE)
+  return(result)
+
+}
+
+system.time(mysimulation("Normal",10, 10000))
+
+```
+
+- Simulation
+
+```{r}
+Dist <- c("Normal", "Exponential", "Lognormal", "Chisq10", "Uniform")
+n <- c(5, 10, 20, 30, 50, 100, 200, 500, 1000)
+
+for (h in 1:length(Dist)) {
+  for (hh in 1:length(n)) {
+    mysimulation(Dist[h], n[hh], 10000)
+  }
+}
+```
+
+##  question 2
+Simulate the type-I error rate and the power of the t-test for above distributions to detect the alternative H1 : μ = δ, where δ ∈ {0, 0.1, 0.2, ..., 1} (use 5% as the nominal level for the test).
+
+
+Type-1 error: the probability of rejecting H0 when it is true (**when delta = 0, we calculate the probability of falsely rejecting H0**)
+
+Power of the one sample t-test: the probability of rejecting H0 when, in fact, it is false (**when delta >0 and <=1, we calculate the probability of correctly reject H0**)
+
+##  question 3
+Vary n to be 5, 10, 20, 30, 50, and 100 and investigate the impact of n on the simulation.
+
+```{r}
+# Power simulation
+mysimulation <- function(Dist, n, nsim, delta) {
+  
+  crit <- qt(0.975, n-1)
+  
+  mu <- matrix(delta, nrow = n, ncol = nsim)
+  
+  if(Dist == "Normal") {
+    x <- mu + matrix(rnorm(n = n*nsim, mean = 0, sd = 1), ncol = nsim)
+  }
+  if(Dist == "Exponential") {
+    x <- mu + matrix(((rexp(n = n*nsim, rate = 1) - 1) / sqrt(1)), ncol = nsim)
+  }
+  if(Dist == "Lognormal") {
+    x <- mu + matrix(((exp(rnorm(n = n*nsim, mean = 0, sd = 1)) - exp(1/2)) / sqrt(exp(1)*(exp(1)-1))), ncol = nsim)
+  }
+  if(Dist == "Chisq10") {
+    x <- mu + matrix(((rchisq(n = n*nsim, df = 10) - 10) / sqrt(20)), ncol = nsim)
+  }
+  if(Dist == "Uniform") {
+    x <- mu + matrix(((runif(n = n*nsim, min = 0, max = 1) - 1/2) / sqrt(1/12)), ncol = nsim)
+  }
+  
+  mx <- colMeans(x)
+  vx <- (colSums(x^2) - n*mx^2) / (n-1)
+  tTest <- sqrt(n) * mx / sqrt(vx)
+  result <- data.frame(n = n, delta = delta, Dist = Dist, tTest = mean(abs(tTest) > crit))
+  write.table(result, row.names = FALSE, col.names = FALSE, quote = FALSE, append = TRUE)
+  return(result)
+}
+
+
+Dist <- c("Normal", "Exponential", "Lognormal", "Chisq10", "Uniform")
+delta <- seq(0, 1, by = 0.1)
+
+
+n <- c(10,30,50,100)
+
+
+
+for(h in 1:length(n)){
+  for(hh in 1:length(delta)){
+    for(hhh in 1:length(Dist)){
+      mysimulation(Dist[hhh], n[h], 10000, delta[hh])
+    }
+  }
+}
+
+```
+
+##  question 4
+Make a summary of your results and compare the estimated type-I error rates and power. State your conclusions.
+
+**conclusion: the greater the n, the smaller the type1_error_rate and the greater power, which means the number of samples increases, resulting the decline of type1_error_rate and type2_error_rate simultaneously**
+
+-   Type-I-error simulation The one sample t-Test works well in case of normally distributed data, even in the case of very small sample sizes (n = 5). In case of exponentially distributed data, the sample size should be around 500, to maintain the 5% error rate. In case of log-normally distributed data, with n = 1000, the type-I-error is still above the 5% level. For Chi-Square-distributed data, with e.g. 10 degrees of freedom, sample size needs to be larger than 100. The same holds for uniformly distributed data.
+
+-   Power Simulation If e.g. δ = 1 and n = 10, the one-sample-t-Test has a power of 80% under normally-distributed data. In case of exponentially and lognormally distributed data, it has a power of 96%, whereas under chi-square distributed data with 10 degrees of freedom, the power is 88%. For uniformly distributed data, the one-sample-t-Test also has a power of 80%. The power increases for all distributions if the effect size δ or the sample size n increases.
+
+# Exercise 3
+
+##  question 1
+Write a simulation program to assess the quality of a 95% confidence interval for a mean.
+
+```{r}
+simu_confint <- function(Dist,n,nsim, mu){
+  
+  if(Dist == "Normal") {
+    x <- matrix(rnorm(n = n*nsim, mu, sd = 1), ncol = nsim)
+  }
+  if(Dist == "Exponential") {
+    x <- matrix(rexp(n = n*nsim, rate = 1/mu), ncol = nsim)
+  }
+
+  crit <- qt(0.975,n-1)
+  
+  mx <- colMeans(x)
+  vx <- (colSums(x^2)-n*mx^2)/(n-1)
+  lower <- mx - crit*sqrt(vx)/sqrt(n)
+  upper <- mx + crit*sqrt(vx)/sqrt(n)
+  
+  Cp <- (mu<upper &  mu>lower) 
+  
+  result = mean(Cp)
+  result
+}
+simu_confint("Normal", 5,10000,10)
+simu_confint("Normal", 5,10000,100)
+simu_confint("Exponential",5,10000,10)
+simu_confint("Normal", 10, 10000,5)
+simu_confint("Normal", 20, 10000,5)
+simu_confint("Exponential", 20, 10000,10)
+simu_confint("Exponential", 50, 10000,10)
+simu_confint("Exponential", 100, 10000,10)
+simu_confint("Exponential", 500, 10000,10)
+simu_confint("Exponential", 1000, 10000,10)
+```
+For normally distributed data, the coverage probability of the confidence interval is al- ready with a very small sample size n = 5 at 95%. For exponentiall distributed data, sample size needs to be larger than 500 to obtain a coverage probability of 95% (analo- gously to the type-I-error simulation).
+
+##  question 2
+Let $X1,...,Xn$ have $E(X_k) = μ$. We want to estimate $θ = μ^2$ . Which of the estimators
+$\hat{θ_1} =\bar{X_2}^2$ or $\hat{θ_2} = \frac{1}{n(n-1)}\sum_{i≠j}{X_iX_j}$
+would you recommend?
+
+```{r}
+mysimulation5 <- function(n,s2,Distribution,nsim){
+  #normal
+  if(Distribution=="Normal"){
+    x <- matrix(rnorm(n=n*nsim)*sqrt(s2),ncol=nsim)
+    miu <- 0
+  }
+  
+  #exponential
+  if(Distribution=="Exp"){
+    x <- matrix((rexp(n=n*nsim)-1)*sqrt(s2),ncol=nsim)
+    miu <- 1
+  }
+  
+  #log-normal
+  if(Distribution=="Log-normal"){
+    x <- matrix(((rlnorm(n=n*nsim)-exp(.5))/sqrt(exp(2)-exp(1)))*sqrt(s2),ncol=nsim)
+    miu <- exp(.5)
+  }
+  
+  #chi-squared 
+  if(Distribution=="Chi-squared"){
+    x <- matrix(((rchisq(n=n*nsim, df=n*nsim-1)-n*nsim)/sqrt(n*nsim))*sqrt(s2),ncol=nsim)
+    miu <- n*nsim   #not sure about the freedem degree of chi-squared
+  }
+  
+  #uniform
+  if(Distribution=="Uni"){
+    x <- matrix(((runif(n=n*nsim)-.5)/sqrt(1/12))*sqrt(s2),ncol=nsim)
+    miu <- .5
+  }
+  
+  crit <- qt(0.975,n-1)
+  
+  mx <- colMeans(x)
+  vx <- (colSums(x^2)-n*mx^2)/(n-1)
+  
+  m1 <- mx^2
+  m2 <- x[1,]*x[2,]
+  for(i in 1:n){
+    for(j in 1:n ){
+      if(i != j){
+        m2 <- m2+x[i,]*x[j,]
+      }
+    }
+  }
+  m2 <- m2/(n*(n-1))
+  v2 <- (colSums(x^2)-n*mx^2)/n
+  
+  result <- data.frame(n=n, sigma2=s2, Dist=Distribution,
+                       bias.m1=mean(m1-miu), MSE.m1=mean((m1-miu)^2),
+                       bias.m2=mean(m2-miu), MSE.m2=mean((m2-miu)^2))
+  result
+}
+mysimulation5(10,1,"Normal",10000)
+```
+**I would recommend $\hat{θ_2} = \frac{1}{n(n-1)}\sum_{i≠j}{X_iX_j}$, because the bias and MSE is smaller **
+
