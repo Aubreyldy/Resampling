@@ -1,0 +1,71 @@
+---
+title: "Exercise_sheet_2_Dingyi_Lai"
+author: "Dingyi Lai"
+date: "11/25/2020"
+output: html_document
+---
+
+Conduct a simulation study to compare the performance of the t-test and a resampling test (use p-values from $t_{n−1}$ or resampling distribution, with $n_{resampling}$ = 10000) in case of small sample sizes. The aim is to test $H_0$ : μ = 0.
+
+```{r}
+rm(list = ls())
+
+mysimulation <- function(n, Dist, nsim, nboot) {
+  
+  # Critical value at 5% level
+  crit <- qt(0.975, n-1) 
+  
+  # Helping Matrix for Nonparametric Bootstrap
+  B <- apply(matrix(1:n, ncol = nboot, nrow = n), 2, sample, replace = TRUE)
+  
+  # Generate data
+  if(Dist == "Normal") x <- matrix(rnorm(n = n*nsim, mean = 0, sd = 1), ncol = nsim)
+  if(Dist == "Exponential") x <- matrix(((rexp(n = n*nsim, rate = 1) - 1) / sqrt(1)), ncol = nsim)
+  
+  # Calculate mean
+  mx <- colMeans(x)
+  
+  # Calculate variance
+  vx <- (colSums(x^2) - n*mx^2) / (n-1)
+  
+  # Caluclate test statistic
+  tTest <- sqrt(n) * mx / sqrt(vx)
+  
+  # Vector of critical values for resampling test
+  critstar1 <- rep(0,nsim)
+  critstar2 <- rep(0,nsim)
+  
+  # Nonparametric Bootstrap
+  for(i in 1:nsim){
+    xi <- x[,i]
+    xstar <- matrix(xi[B], ncol = nboot, nrow = n)
+    mxstar <- colMeans(xstar)
+    vxstar <- (colSums(xstar^2) - n*mxstar^2) / (n-1)
+    tTeststar <- sqrt(n) * (mxstar-mx[i]) / sqrt(vxstar)
+    critstar1[i] <- quantile(tTeststar, 0.025)
+    critstar2[i] <- quantile(tTeststar, 0.975)
+  }
+  
+  result <- data.frame(n = n, Dist = Dist, tTest = mean(abs(tTest) > crit), pTest = mean(tTest > critstar2 | tTest < critstar1 ))
+  write.table(result, sep = "\t",  eol = "\r\n", row.names = F, col.names = F, quote = FALSE, append = TRUE)
+  return(result)
+}
+
+Dist <- c("Normal", "Exponential")
+n <- c(10,15,20)
+
+for(h in 1:length(Dist)){
+  for(hh in 1:length(n)){
+    mysimulation(n[hh], Dist[h], nsim = 10000, nboot = 10000)
+  }
+}
+
+# Precision Interval
+(PI_l <- 0.05-1.96/10000 * sqrt(0.05*(1-0.05))) # 0.04995728
+(PI_u <- 0.05+1.96/10000 * sqrt(0.05*(1-0.05))) # 0.05004272
+```
+
+
+conclusion: 
+
+For normally distributed data, both test procedures work well. In case of exponentially distributed data, the original t-Test is very liberal, whereas the resampling test almost holds the 5% significance level.
