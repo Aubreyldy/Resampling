@@ -1,0 +1,216 @@
+---
+title: "Exercise_sheet_3_Dingyi_Lai"
+author: "Dingyi Lai"
+date: "12/1/2020"
+output: html_document
+---
+
+Exercise 1
+
+Consider a sample $X_1, . . . , X_n ∼ F$, where F is any distribution. We are interested in investigating the accuracy of the Wild Bootstrap approach of the one sample t-test in terms of controlling the pre-assigned type-I error level (5%) under the null hypothesis H0 : µ = 0. Write a simulation program using efficient implementation techniques. Follow the steps below.
+
+```{r}
+mysimulation <- function(Dist, n,nsim, nboot) {
+  tt = Tboot1 = Tboot2 = Tboot3 = Tboot4= c()
+#Generate random data X1,...Xn from a normalized population F, where F is normal, exponential, log-normal, chi-squared and uniform distribution
+  if(Dist == "Normal") {
+    x <- matrix(rnorm(n = n*nsim, mean = 0, sd = 1), ncol = nsim)
+  }
+  
+  if(Dist == "Exponential") {
+    x <- matrix(((rexp(n = n*nsim, rate = 1) - 1) / sqrt(1)), ncol = nsim)
+  }
+  
+  if(Dist == "Lognormal") {
+    x <- matrix(((exp(rnorm(n = n*nsim, mean = 0, sd = 1)) - exp(1/2)) / sqrt(exp(1)*(exp(1)-1))), ncol = nsim)
+  }
+  
+  if(Dist == "Chisq10") {
+    x <- matrix(((rchisq(n = n*nsim, df = 10) - 10) / sqrt(20)), ncol = nsim)
+  }
+  
+  if(Dist == "Uniform") {
+    x <- matrix(((runif(n = n*nsim, min = 0, max = 1) - 1/2) / sqrt(1/12)), ncol = nsim)
+  }
+  
+  #Simulate the original t-test statistic.
+  mx <- colMeans(x)
+  vx <- (colSums(x^2) - n*mx^2) / (n-1)
+  tt <- sqrt(n) * mx / sqrt(vx)
+  
+  #Generate iid random weight W1,...,Wn with E(Wk)=0 and Var(Wk)=1, which are independent of the data
+  
+  #Type 1: Standard normal weights
+  W1 <- matrix(rnorm(n = n*nboot, mean = 0, sd = 1), ncol = nboot)
+  
+  #Type 2: Rademacher weights
+  W2 <- matrix(rbinom(n*nboot, 1, 1/2) * 2 - 1,ncol = nboot,nrow = n)
+  
+  #Type 2: Rademacher weights
+  W3 <- matrix(runif(n = n*nboot, min = -sqrt(12)/2, max = sqrt(12)/2),ncol = nboot, nrow = n)
+  
+  
+  #Generate Wild Bootstrap resampling variables using above three types of Wk’s
+  for (i in 1:nsim) {
+    xstar = matrix((x[,i]-mx[i])*W1, ncol = nboot, nrow = n)
+    mxstar = colMeans(xstar)
+    vxb = (colSums(xstar^2)-n*mxstar^2)/(n-1)
+    Tstar = sqrt(n)*(mxstar)/sqrt(vxb)
+    p1 = mean(Tstar >= tt[i])
+    p2 = mean(Tstar <= tt[i])
+    Tboot1[i] = (2*min(p1,p2)<0.05)
+    }
+  for (i in 1:nsim) {
+    xstar = matrix((x[,i]-mx[i])*W2, ncol = nboot, nrow = n)
+    mxstar = colMeans(xstar)
+    vxb = (colSums(xstar^2)-n*mxstar^2)/(n-1)
+    Tstar = sqrt(n)*(mxstar)/sqrt(vxb)
+    p1 = mean(Tstar >= tt[i])
+    p2 = mean(Tstar <= tt[i])
+    Tboot2[i] = (2*min(p1,p2)<0.05)
+  }
+  for (i in 1:nsim) {
+    xstar = matrix((x[,i]-mx[i])*W3, ncol = nboot, nrow = n)
+    mxstar = colMeans(xstar)
+    vxb = (colSums(xstar^2)-n*mxstar^2)/(n-1)
+    Tstar = sqrt(n)*(mxstar)/sqrt(vxb)
+    p1 = mean(Tstar >= tt[i])
+    p2 = mean(Tstar <= tt[i])
+    Tboot3[i] = (2*min(p1,p2)<0.05)
+  }
+  
+  #non-parametric bootstrap (just for comparation)
+    B <- apply(matrix(1:n,ncol=nboot,nrow = n), 2, sample, replace=TRUE)
+  for (i in 1:nsim) {
+    xstar = matrix(x[,i][B], ncol = nboot, nrow = n)
+    mxstar = colMeans(xstar)
+    vxb = (colSums(xstar^2)-n*mxstar^2)/(n-1)
+    Tstar = sqrt(n)*(mxstar - mx[i])/sqrt(vxb)
+    p1 = mean(Tstar >= tt[i])
+    p2 = mean(Tstar <= tt[i])
+    Tboot4[i] = (2*min(p1,p2)<0.05)}
+  
+    #Simulate the Wild Bootstrap t-test statistic and estimate the type-I error rate of the one sample t-test.
+
+  result = data.frame(n=n,nsim=nsim,nboot=nboot,Dist=Dist, tt=mean(abs(tt)>qt(0.975,n-1)), Tbootw1 = mean(Tboot1), Tbootw2 = mean(Tboot2), Tbootw3 = mean(Tboot3), Tboot4 = mean(Tboot4))
+  write.table(result, row.names = FALSE, col.names = FALSE, quote = FALSE, append = TRUE)
+  return(result)
+}
+
+```
+
+Vary the sample size n to be 5, 10, 20, 30, 50, and 100 and investigate how the error rate is affected by n.
+
+```{r}
+set.seed(1)
+
+Dist <- c("Normal", "Exponential", "Lognormal", "Chisq10", "Uniform")
+
+n <- c(5,10,20,30,50,100)
+
+for(h in 1:length(n)){
+  for(hh in 1:length(Dist)){
+    mysimulation(Dist[hh], n[h], 1000, 1000)
+  }
+}
+
+```
+
+Conclusion:
+
+In the case of n=5, the performance of applying the type 2 random weight to wild bootstrap is better than t-test, non-parametric bootstrap and the other 2 types random weight in wild bootstrap.
+   
+As n increases, the error rate of wild bootstrap could be controlled near 0.05. The result of using type 1 random weight in wild bootstrap is unstable, type 2 random weight is quite good, type 3 is somehow in-between. Overall, wild bootstrap could control the type1 error rate better than t-test, generally worse than non-parametric bootstrap.
+   
+If the original distribution is symmetric, then the distance between error rate of wild bootstrap and of non-parametric bootstrap is not that large, but if the original distribution is skewed, then the performance of non-parametric bootstrap is much better than wild bootstrap and t-test.
+
+```{r}
+library(xtable)
+
+myboot <- function(Dist, n, nsim, nboot) {
+  
+  T <- TWBNor <- TWBRad <- TWBUni <- c() # To save the results
+  
+  #-----Generate random data-----#
+  if(Dist == "Normal") {
+    x <- matrix(rnorm(n = n*nsim, mean = 0, sd = 1), ncol = nsim)
+  }
+  if(Dist == "Exponential") {
+    x <- matrix(((rexp(n = n*nsim, rate = 1) - 1) / sqrt(1)), ncol = nsim)
+  }
+  if(Dist == "Lognormal") {
+    x <- matrix(((exp(rnorm(n = n*nsim, mean = 0, sd = 1)) - exp(1/2)) / sqrt(exp(1)*(exp(1)-1))), ncol = nsim)
+  }
+  if(Dist == "Chisq10") {
+    x <- matrix(((rchisq(n = n*nsim, df = 10) - 10) / sqrt(20)), ncol = nsim)
+  }
+  if(Dist == "Uniform") {
+    x <- matrix(((runif(n = n*nsim, min = 0, max = 1) - 1/2) / sqrt(1/12)), ncol = nsim)
+  }
+  
+  #-----Simulate original t-test-----#
+  mx <- colMeans(x)
+  vx <- (colSums(x^2) - n*mx^2) / (n-1)
+  T <- sqrt(n) * mx / sqrt(vx)
+  
+  #-----Generate random weights-----#
+  WN <- matrix(rnorm(nboot*n), nrow = n, ncol = nboot)
+  WR <- matrix(rbinom(nboot*n, 1, 1/2)*2 - 1, nrow = n, ncol = nboot)
+  WU <- matrix(runif(nboot*n, -sqrt(12)/2, sqrt(12)/2), nrow = n, ncol = nboot)
+  
+  #-----Center data-----#
+  mxmat <- matrix(mx, nrow = n, ncol = nsim, byrow = TRUE)
+  zmat <- x - mxmat
+  
+  for (i in 1:nsim) {
+    ztemp <- matrix(zmat[, i], nrow = n, ncol = nboot)
+    #-----Generate WB resampling variables-----#
+    xstar.N <- WN * ztemp 
+    xstar.R <- WR * ztemp
+    xstar.U <- WU * ztemp
+    #-----Simulate WB t-test-----#
+    mxstar.N <- colMeans(xstar.N)
+    vxstar.N <- (colSums(xstar.N^2) - n*mxstar.N^2) / (n-1)
+    Tstar.N <- sqrt(n) * mxstar.N / sqrt(vxstar.N)
+    
+    mxstar.R <- colMeans(xstar.R)
+    vxstar.R <- (colSums(xstar.R^2) - n*mxstar.R^2) / (n-1)
+    Tstar.R <- sqrt(n) * mxstar.R / sqrt(vxstar.R)
+    
+    mxstar.U <- colMeans(xstar.U)
+    vxstar.U <- (colSums(xstar.U^2) - n*mxstar.U^2) / (n-1)
+    Tstar.U <- sqrt(n) * mxstar.U / sqrt(vxstar.U)
+    #-----Estimate type-I error rate-----#
+    critN_1 <- quantile(Tstar.N, 0.025)
+    critN_2 <- quantile(Tstar.N, 0.975)
+    TWBNor[i] <- (T[i] < critN_1 | T[i] > critN_2)
+    
+    critR_1 <- quantile(Tstar.R, 0.025)
+    critR_2 <- quantile(Tstar.R, 0.975)
+    TWBRad[i] <- (T[i] < critR_1 | T[i] > critR_2)
+    
+    critU_1 <- quantile(Tstar.U, 0.025)
+    critU_2 <- quantile(Tstar.U, 0.975)
+    TWBUni[i] <- (T[i] < critU_1 | T[i] > critU_2)
+  }
+  
+  result <- data.frame(n = n, Dist = Dist, tTest = mean(abs(T) > qt(0.975, n-1)), tWBNor = mean(TWBNor),
+                       tWBRad = mean(TWBRad), tWBUni = mean(TWBUni))
+  write.table(result, "results.txt",
+              sep = "\t",  eol = "\r\n", row.names = FALSE, col.names = FALSE, quote = FALSE, append = TRUE)
+  print(result)
+}
+
+
+Dist <- c("Normal", "Exponential", "Lognormal", "Chisq10", "Uniform")
+n <- c(5, 10, 20, 30, 50, 100)
+
+for(h in 1:length(Dist)){
+  for(hh in 1:length(n)){
+    myboot(Dist[h], n[hh], 1000,1000)
+  }
+}
+table <- read.table("results.txt")
+xtable(table, digits = 4)
+```
+The Wild-Bootstrap technique does not seem to improve the t-Test in most cases
